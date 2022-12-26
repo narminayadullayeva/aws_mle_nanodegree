@@ -1,0 +1,7 @@
+jupyterlab
+jupyterlab-git
+mxnet<2.0.0
+autogluon
+bokeh==2.0.1
+kaggle
+pandas
