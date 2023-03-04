@@ -2,3 +2,4 @@ AutogluonModels
 *.zip
 *.csv
 *checkpoint*
+custom_env*
