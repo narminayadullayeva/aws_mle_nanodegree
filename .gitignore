@@ -3,3 +3,5 @@ AutogluonModels
 *.csv
 *checkpoint*
 custom_env*
+*.jpg
+*.json

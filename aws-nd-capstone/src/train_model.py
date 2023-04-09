@@ -138,35 +138,70 @@ def get_pretrained_model(args, num_classes):
     return model
 
 
-def download_data():
-    """ 
+def get_mean_and_std(loader):
     """
-    dataset = torchvision.datasets.Caltech256(root="./data", download=True)
-    data_path = dataset.root + "/256_ObjectCategories"
-    return data_path
+    Function that calculates mean and std of image dataset
+    """
+    mean = 0.
+    std = 0.
+    total_images_count = 0
 
+    for images, _ in loader:
+        image_count_in_a_batch = images.size(0)
+        images = images.view(image_count_in_a_batch, images.size(1), -1)
+        mean += images.mean(2).sum(0)
+        std += images.std(2).sum(0)
+        total_images_count += image_count_in_a_batch
 
-def create_data_loaders(data, args):
+    mean /= total_images_count
+    std /= total_images_count
 
-    val_split = args.val_split
-    targets = data.targets
+    return mean, std
 
-    train_idx, valid_idx = train_test_split(
-        np.arange(len(targets)),
-        test_size=val_split,
-        random_state=42,
-        shuffle=True,
-        stratify=targets,
-    )
+def create_data_loaders(args):
+    
+    train_data_path = os.path.join(args.data_dir, args.data_path, 'train/')
+    test_data_path = os.path.join(args.data_dir, args.data_path, 'test/')
+    
+    image_size = args.image_size
+    batch_size= args.batch_size
+    
+    train_transform = transforms.Compose([    
+            transforms.Resize((image_size,image_size)),
+            transforms.ToTensor()   
+    ])
 
-    train_sampler = torch.utils.data.sampler.SubsetRandomSampler(train_idx)
-    val_sampler = torch.utils.data.sampler.SubsetRandomSampler(valid_idx)
+    train_dataset = torchvision.datasets.ImageFolder(root=train_data_path, transform=train_transform)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False) 
+    
+    train_mean, train_std = get_mean_and_std(train_loader)
+    
+    train_transform = transforms.Compose([    
+            transforms.Resize((image_size,image_size)),
+            transforms.RandomHorizontalFlip(),
+            # transforms.RandomRotation(10),   
+            transforms.ToTensor(),    
+            transforms.Normalize(torch.Tensor(train_mean), torch.Tensor(train_std))
+        ])
 
+    test_transform = transforms.Compose([    
+            transforms.Resize((image_size,image_size)),     
+            transforms.ToTensor(),    
+            transforms.Normalize(torch.Tensor(train_mean), torch.Tensor(train_std))
+        ])
+
+    train_dataset = torchvision.datasets.ImageFolder(root=train_data_path, transform=train_transform)
+    test_dataset = torchvision.datasets.ImageFolder(root=test_data_path, transform=test_transform)
+
+    num_classes = len(set(train_dataset.targets))
+    logger.info(f"--- num_classes: {num_classes} ---")
+    
+    
     train_loader = torch.utils.data.DataLoader(
-        data, batch_size=args.batch_size, sampler=train_sampler
+        train_dataset, batch_size=args.batch_size, shuffle = True
     )
     val_loader = torch.utils.data.DataLoader(
-        data, batch_size=args.test_batch_size, sampler=val_sampler
+        test_dataset, batch_size=args.test_batch_size, shuffle = False
     )
 
     dataset_loader = {
@@ -174,44 +209,24 @@ def create_data_loaders(data, args):
         "valid": val_loader,
     }
 
-    return dataset_loader
+    return dataset_loader, num_classes
 
 
 def main(args):
     if torch.cuda.is_available():
         device = torch.device("cuda:0")
     else:
-        device = torch.device("cpu")
+        if torch.backends.mps.is_available():
+            device = torch.device("mps") # Apple Silicon Users like me
+        else:
+            device = torch.device("cpu")
 
     logger.info(f"--- Running on Device {device} ---")
-
+    
     logger.info("--- Loading and Transforming Dataset ---")
+    
+    dataset_loader, num_classes = create_data_loaders(args)
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
-
-    data_path = os.path.join(args.data_dir, args.data_path)
-
-    try:
-        dataset = torchvision.datasets.ImageFolder(root=data_path, transform=transform)
-    except Exception:
-        logger.info(
-            f"Couldn't load dataset from {data_path} path. Will try downloading."
-        )
-        data_path = args.data_dir + download_data()
-        dataset = torchvision.datasets.ImageFolder(root=data_path, transform=transform)
-
-    num_classes = len(set(dataset.targets))
-    logger.info(f"--- num_classes: {num_classes} ---")
-
-    logger.info("--- Getting training and testing data loaders... ---")
-    dataset_loader = create_data_loaders(dataset, args)
     logger.info("--- Initializing pre-trained model ---")
 
     model = get_pretrained_model(args, num_classes)
@@ -245,6 +260,14 @@ if __name__ == "__main__":
 
     # Data and model checkpoints directories
     parser.add_argument(
+        "--image-size",
+        type=int,
+        default=224,
+        metavar="N",
+        help="input image size for training (default: 224)",
+    )
+    
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=32,
@@ -271,7 +294,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--val-split",
         type=float,
-        default=0.1,
+        default=0.2,
         metavar="VS",
         help="fraction of images to be used for test purposes (default: 0.1)",
     )
@@ -299,30 +322,38 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data-path",
         type=str,
-        default="data/caltech256/256_ObjectCategories",
-        help="Path with data (default: data/caltech256/256_ObjectCategories)",
+        default="./train_data",
+        help="Path with data (default: './train_data')",
     )
     
-    
-    parser.add_argument("--model-dir", type=str, default='.')
     parser.add_argument(
-        "--data-dir", type=str, default='.'
+        "--local",
+        type=bool,
+        default=True,
+        help="Flag to run traning locally or via AWS (default: True)",
     )
     
+    args = parser.parse_args()
     
-    # # Container environment
-    # parser.add_argument(
-    #     "--hosts", type=list, default=json.loads(os.environ["SM_HOSTS"])
-    # )
-    # parser.add_argument(
-    #     "--current-host", type=str, default=os.environ["SM_CURRENT_HOST"]
-    # )
-    # parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
-    # parser.add_argument(
-    #     "--data-dir", type=str, default=os.environ["SM_CHANNEL_TRAINING"]
-    # )
-    # parser.add_argument("--num-gpus", type=int, default=os.environ["SM_NUM_GPUS"])
-    # parser.add_argument("--gpu", type=str2bool, default=True)
+    if args.local:
+        parser.add_argument("--model-dir", type=str, default='.')
+        parser.add_argument("--data-dir", type=str, default='.')
+        
+    else:
+        
+        # Container environment
+        parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
+        parser.add_argument(
+            "--data-dir", type=str, default=os.environ["SM_CHANNEL_TRAINING"]
+        )
+        parser.add_argument(
+            "--hosts", type=list, default=json.loads(os.environ["SM_HOSTS"])
+        )
+        parser.add_argument(
+            "--current-host", type=str, default=os.environ["SM_CURRENT_HOST"]
+        )
+        parser.add_argument("--num-gpus", type=int, default=os.environ["SM_NUM_GPUS"])
+        parser.add_argument("--gpu", type=str2bool, default=True)
 
     args = parser.parse_args()
 
