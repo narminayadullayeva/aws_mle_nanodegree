@@ -36,10 +36,9 @@ def input_fn(request_body, content_type):
     img = Image.open(iobytes)
     preprocess = transforms.Compose(
         [
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            transforms.Resize((224,224)),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.Normalize(mean=[0.5232, 0.4421, 0.3526], std=[0.1355, 0.1196, 0.0899]),
         ]
     )
     input_tensor = preprocess(img)

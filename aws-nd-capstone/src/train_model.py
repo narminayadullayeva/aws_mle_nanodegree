@@ -160,8 +160,8 @@ def get_mean_and_std(loader):
 
 def create_data_loaders(args):
     
-    train_data_path = os.path.join(args.data_dir, args.data_path, 'train/')
-    test_data_path = os.path.join(args.data_dir, args.data_path, 'test/')
+    train_data_path = os.path.join(args.data_dir, 'train/')
+    test_data_path = os.path.join(args.data_dir, 'test/')
     
     image_size = args.image_size
     batch_size= args.batch_size
@@ -302,7 +302,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model-type",
         type=str,
-        default="resnet18",
+        default="resnet50",
         help="Pytorch model to use for fine-tuning (default: resnet18)",
     )
     parser.add_argument(
@@ -319,12 +319,6 @@ if __name__ == "__main__":
         metavar="M",
         help="SGD momentum (default: 0.5)",
     )
-    parser.add_argument(
-        "--data-path",
-        type=str,
-        default="./train_data",
-        help="Path with data (default: './train_data')",
-    )
     
     parser.add_argument(
         "--local",
@@ -335,25 +329,26 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    if args.local:
-        parser.add_argument("--model-dir", type=str, default='.')
-        parser.add_argument("--data-dir", type=str, default='.')
+    # if args.local:
+    #     logger.info('Running locally!')
+    #     parser.add_argument("--model-dir", type=str, default='')
+    #     parser.add_argument("--data-dir", type=str, default='')
         
-    else:
+    # else:
         
         # Container environment
-        parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
-        parser.add_argument(
-            "--data-dir", type=str, default=os.environ["SM_CHANNEL_TRAINING"]
-        )
-        parser.add_argument(
-            "--hosts", type=list, default=json.loads(os.environ["SM_HOSTS"])
-        )
-        parser.add_argument(
-            "--current-host", type=str, default=os.environ["SM_CURRENT_HOST"]
-        )
-        parser.add_argument("--num-gpus", type=int, default=os.environ["SM_NUM_GPUS"])
-        parser.add_argument("--gpu", type=str2bool, default=True)
+    parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"])
+    parser.add_argument(
+        "--data-dir", type=str, default=os.environ["SM_CHANNEL_TRAINING"]
+    )
+    parser.add_argument(
+        "--hosts", type=list, default=json.loads(os.environ["SM_HOSTS"])
+    )
+    parser.add_argument(
+        "--current-host", type=str, default=os.environ["SM_CURRENT_HOST"]
+    )
+    parser.add_argument("--num-gpus", type=int, default=os.environ["SM_NUM_GPUS"])
+    parser.add_argument("--gpu", type=str2bool, default=True)
 
     args = parser.parse_args()
 
