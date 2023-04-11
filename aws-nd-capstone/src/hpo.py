@@ -292,8 +292,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model-type",
         type=str,
-        default="resnet18",
-        help="Pytorch model to use for fine-tuning (default: resnet18)",
+        default="resnet50",
+        help="Pytorch model to use for fine-tuning (default: resnet50)",
     )
     parser.add_argument(
         "--lr",

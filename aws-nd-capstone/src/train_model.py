@@ -123,10 +123,14 @@ def get_pretrained_model(args, num_classes):
 
     elif args.model_type == "resnet50":
         model = models.resnet50(pretrained=True)
+        
+        
+    elif args.model_type == 'resnet101':
+        model = models.resnet101(pretrained=True)
 
     else:
         logger.info(f"{args.model_type} not found. Will use defaul option: ResNet18.")
-        model = models.resnet18(pretrained=True)
+        model = models.resnet50(pretrained=True)
 
     for param in model.parameters():
         param.requires_grad = False
@@ -303,7 +307,7 @@ if __name__ == "__main__":
         "--model-type",
         type=str,
         default="resnet50",
-        help="Pytorch model to use for fine-tuning (default: resnet18)",
+        help="Pytorch model to use for fine-tuning (default: resnet50)",
     )
     parser.add_argument(
         "--lr",
